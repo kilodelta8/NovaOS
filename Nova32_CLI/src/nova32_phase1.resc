@@ -1,0 +1,47 @@
+# ============================================================================
+# Project NOVA-32 | Phase 1 Renode Emulation Script (nova32_phase1.resc)
+# Target: STMicroelectronics STM32H743ZIT6 (Cortex-M7)
+# ============================================================================
+
+using sysbus
+$name?="NOVA-32"
+mach create $name
+
+# 1. Load the built-in STM32H743 platform description
+machine LoadPlatformDescription @platforms/cpus/stm32h743.repl
+
+# 2. Match SysTick frequency to Phase 1 clock (64 MHz HSI)
+sysbus.nvic Frequency 64000000
+
+# 3. Mock PWR_CSR1 (0x58024804) bit 13 (ACTVOSRDY = 0x2000) so the bare-metal
+#    LDO voltage scaling readiness loop in clock_init() completes immediately.
+sysbus Tag <0x58024804 4> "PWR_CSR1" 0x00002000
+
+# 4. Mock RCC_CR (0x58024400) bit 2 (HSIRDY = 0x00000004) + bit 0 (HSION = 0x1)
+#    as a fallback in case your Renode version resets RCC_CR to 0.
+sysbus Tag <0x58024400 4> "RCC_CR" 0x00000005
+
+# 5. Expose USART3 both in a GUI analyzer window AND on localhost TCP port 3456
+#    so you can attach with telnet/netcat from any Linux terminal.
+showAnalyzer sysbus.usart3
+emulation CreateServerSocketTerminal 3456 "nova32_cli_socket" false
+connector Connect sysbus.usart3 nova32_cli_socket
+
+# 6. Start a GDB server on port 3333 so `make debug` attaches seamlessly
+machine StartGdbServer 3333
+
+# 7. Define reset macro to reload ELF and set Vector Table Offset Register
+macro reset
+"""
+    sysbus LoadELF @build/novaos_v01.elf
+    sysbus.cpu VectorTableOffset 0x08000000
+"""
+
+runMacro $reset
+echo "=================================================================="
+echo " NOVA-32 Phase 1 loaded!"
+echo " - UART Console TCP Socket : telnet localhost 3456"
+echo " - GDB Remote Debug Server : localhost:3333"
+echo " Starting CPU execution..."
+echo "=================================================================="
+start

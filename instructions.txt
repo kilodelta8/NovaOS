@@ -1,0 +1,14 @@
+# Install prerequisites (Ubuntu/Debian)
+sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi gdb-multiarch stlink-tools openocd
+
+# Compile NovaOS v0.1 and display memory usage
+make
+
+# Flash binary to STM32H743 Bank 1 Flash (0x08000000)
+make flash
+
+# Inspect generated assembly and symbol addresses
+make disasm
+
+# Open serial console to USART3 (115200 8N1)
+picocom -b 115200 /dev/ttyACM0
